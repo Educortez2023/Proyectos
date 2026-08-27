@@ -66,6 +66,7 @@ class MovimientoModel:
             cursor.close()
             conexion.close()
 
+
     # =====================================================
     # BUSCAR MOVIMIENTOS
     # =====================================================
@@ -153,6 +154,7 @@ class MovimientoModel:
             cursor.close()
             conexion.close()
 
+
     # =====================================================
     # LISTAR TIPOS DE MOVIMIENTO
     # =====================================================
@@ -192,6 +194,7 @@ class MovimientoModel:
 
             cursor.close()
             conexion.close()
+
 
     # =====================================================
     # LISTAR INSUMOS
@@ -234,6 +237,7 @@ class MovimientoModel:
             cursor.close()
             conexion.close()
 
+
     # =====================================================
     # LISTAR RESPONSABLES
     # =====================================================
@@ -275,6 +279,7 @@ class MovimientoModel:
             cursor.close()
             conexion.close()
 
+
     # =====================================================
     # OBTENER UN INSUMO
     # =====================================================
@@ -315,6 +320,7 @@ class MovimientoModel:
 
             cursor.close()
             conexion.close()
+
 
     # =====================================================
     # REGISTRAR MOVIMIENTO
@@ -366,6 +372,7 @@ class MovimientoModel:
                     "La cantidad debe ser mayor que cero."
                 )
 
+
             # =================================================
             # OBTENER STOCK ACTUAL
             # =================================================
@@ -400,6 +407,7 @@ class MovimientoModel:
 
                 stock_anterior = 0
 
+
             # =================================================
             # OBTENER TIPO DE MOVIMIENTO
             # =================================================
@@ -432,6 +440,7 @@ class MovimientoModel:
                 tipo[0]
             ).upper().strip()
 
+
             # =================================================
             # CALCULAR NUEVO STOCK
             # =================================================
@@ -459,9 +468,6 @@ class MovimientoModel:
 
             elif tipo_movimiento == "AJUSTE":
 
-                # Para AJUSTE la cantidad representa
-                # directamente el nuevo stock.
-
                 stock_nuevo = cantidad
 
             else:
@@ -469,6 +475,7 @@ class MovimientoModel:
                 raise Exception(
                     "Tipo de movimiento no válido."
                 )
+
 
             # =================================================
             # ACTUALIZAR STOCK DEL INSUMO
@@ -490,6 +497,7 @@ class MovimientoModel:
                     id_insumo
                 )
             )
+
 
             # =================================================
             # REGISTRAR MOVIMIENTO
@@ -532,6 +540,7 @@ class MovimientoModel:
                 valores
             )
 
+
             # =================================================
             # CONFIRMAR TRANSACCIÓN
             # =================================================
@@ -548,6 +557,7 @@ class MovimientoModel:
 
             cursor.close()
             conexion.close()
+
 
     # =====================================================
     # OBTENER UN MOVIMIENTO
@@ -589,6 +599,201 @@ class MovimientoModel:
             )
 
             return cursor.fetchone()
+
+        finally:
+
+            cursor.close()
+            conexion.close()
+
+
+    # =====================================================
+    # ELIMINAR MOVIMIENTO
+    # =====================================================
+
+    def eliminar(self, id_movimiento):
+
+        conexion = Conexion.obtener_conexion()
+
+        if conexion is None:
+            raise Exception(
+                "No se pudo conectar con la base de datos."
+            )
+
+        cursor = conexion.cursor()
+
+        try:
+
+            # =================================================
+            # OBTENER MOVIMIENTO
+            # =================================================
+
+            sql_movimiento = """
+                SELECT
+                    id_movimiento,
+                    id_insumo,
+                    stock_anterior,
+                    stock_nuevo
+
+                FROM movimientos
+
+                WHERE id_movimiento = %s
+
+                FOR UPDATE
+            """
+
+            cursor.execute(
+                sql_movimiento,
+                (id_movimiento,)
+            )
+
+            movimiento = cursor.fetchone()
+
+            if movimiento is None:
+
+                raise Exception(
+                    "El movimiento seleccionado "
+                    "no existe."
+                )
+
+            id_movimiento_db = movimiento[0]
+            id_insumo = movimiento[1]
+            stock_anterior = movimiento[2]
+            stock_nuevo = movimiento[3]
+
+
+            # =================================================
+            # VERIFICAR QUE SEA EL ÚLTIMO MOVIMIENTO
+            # DEL MISMO INSUMO
+            # =================================================
+
+            sql_ultimo = """
+                SELECT
+                    id_movimiento
+
+                FROM movimientos
+
+                WHERE id_insumo = %s
+
+                ORDER BY
+                    id_movimiento DESC
+
+                LIMIT 1
+
+                FOR UPDATE
+            """
+
+            cursor.execute(
+                sql_ultimo,
+                (id_insumo,)
+            )
+
+            ultimo = cursor.fetchone()
+
+            if ultimo is None:
+
+                raise Exception(
+                    "No se pudo verificar "
+                    "el último movimiento."
+                )
+
+            if ultimo[0] != id_movimiento_db:
+
+                raise Exception(
+                    "No se puede eliminar este movimiento "
+                    "porque existen movimientos posteriores "
+                    "para el mismo insumo.\n\n"
+                    "Para mantener el stock y el historial "
+                    "correctos, primero debe eliminar "
+                    "el movimiento más reciente."
+                )
+
+
+            # =================================================
+            # OBTENER STOCK ACTUAL
+            # =================================================
+
+            sql_stock_actual = """
+                SELECT
+                    stock
+
+                FROM insumos
+
+                WHERE id_insumo = %s
+
+                FOR UPDATE
+            """
+
+            cursor.execute(
+                sql_stock_actual,
+                (id_insumo,)
+            )
+
+            stock = cursor.fetchone()
+
+            if stock is None:
+
+                raise Exception(
+                    "El insumo asociado al movimiento "
+                    "no existe."
+                )
+
+
+            # =================================================
+            # RESTAURAR STOCK ANTERIOR
+            # =================================================
+
+            sql_restaurar_stock = """
+                UPDATE insumos
+
+                SET
+                    stock = %s
+
+                WHERE id_insumo = %s
+            """
+
+            cursor.execute(
+                sql_restaurar_stock,
+                (
+                    stock_anterior,
+                    id_insumo
+                )
+            )
+
+
+            # =================================================
+            # ELIMINAR MOVIMIENTO
+            # =================================================
+
+            sql_delete = """
+                DELETE FROM movimientos
+
+                WHERE id_movimiento = %s
+            """
+
+            cursor.execute(
+                sql_delete,
+                (id_movimiento_db,)
+            )
+
+            if cursor.rowcount == 0:
+
+                raise Exception(
+                    "No se pudo eliminar "
+                    "el movimiento."
+                )
+
+
+            # =================================================
+            # CONFIRMAR TRANSACCIÓN
+            # =================================================
+
+            conexion.commit()
+
+        except Exception:
+
+            conexion.rollback()
+
+            raise
 
         finally:
 

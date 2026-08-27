@@ -194,6 +194,25 @@ class VentanaMovimientos(ctk.CTkToplevel):
         )
 
         # =================================================
+        # BOTÓN ELIMINAR
+        # =================================================
+
+        btn_eliminar = ctk.CTkButton(
+            frame_controles,
+            text="🗑 Eliminar",
+            width=120,
+            fg_color="#C62828",
+            hover_color="#8E0000",
+            command=self.eliminar_movimiento
+        )
+
+        btn_eliminar.pack(
+            side="left",
+            padx=5,
+            pady=10
+        )
+
+        # =================================================
         # BOTÓN EXPORTAR
         # =================================================
 
@@ -620,6 +639,148 @@ class VentanaMovimientos(ctk.CTkToplevel):
 
 
     # =====================================================
+    # ELIMINAR MOVIMIENTO
+    # =====================================================
+
+    def eliminar_movimiento(self):
+
+        # =================================================
+        # VERIFICAR SELECCIÓN
+        # =================================================
+
+        seleccion = self.tabla.selection()
+
+        if not seleccion:
+
+            messagebox.showwarning(
+                "Eliminar movimiento",
+                (
+                    "Seleccione un movimiento "
+                    "de la tabla antes de eliminar."
+                ),
+                parent=self
+            )
+
+            return
+
+        # =================================================
+        # OBTENER DATOS DE LA FILA
+        # =================================================
+
+        item = seleccion[0]
+
+        valores = self.tabla.item(
+            item,
+            "values"
+        )
+
+        if not valores:
+
+            messagebox.showwarning(
+                "Eliminar movimiento",
+                "No se pudieron obtener los datos del movimiento.",
+                parent=self
+            )
+
+            return
+
+        # =================================================
+        # OBTENER ID
+        # =================================================
+
+        try:
+
+            id_movimiento = int(
+                valores[0]
+            )
+
+        except (ValueError, TypeError):
+
+            messagebox.showerror(
+                "Error",
+                "El ID del movimiento seleccionado no es válido.",
+                parent=self
+            )
+
+            return
+
+        # =================================================
+        # DATOS INFORMATIVOS
+        # =================================================
+
+        codigo = valores[1]
+        insumo = valores[2]
+        tipo = valores[3]
+        cantidad = valores[4]
+
+        # =================================================
+        # CONFIRMAR ELIMINACIÓN
+        # =================================================
+
+        confirmar = messagebox.askyesno(
+            "Confirmar eliminación",
+            (
+                "¿Está seguro de eliminar este movimiento?\n\n"
+                f"ID: {id_movimiento}\n"
+                f"Insumo: {insumo}\n"
+                f"Código: {codigo}\n"
+                f"Movimiento: {tipo}\n"
+                f"Cantidad: {cantidad}\n\n"
+                "El stock del insumo será restaurado "
+                "al valor anterior del movimiento."
+            ),
+            parent=self
+        )
+
+        if not confirmar:
+
+            return
+
+        # =================================================
+        # ELIMINAR DESDE EL MODELO
+        # =================================================
+
+        try:
+
+            self.model.eliminar(
+                id_movimiento
+            )
+
+            messagebox.showinfo(
+                "Movimiento eliminado",
+                (
+                    "El movimiento fue eliminado "
+                    "correctamente.\n\n"
+                    "El stock anterior del insumo "
+                    "fue restaurado."
+                ),
+                parent=self
+            )
+
+            # =================================================
+            # ACTUALIZAR TABLA
+            # =================================================
+
+            self.cargar_movimientos()
+
+        except Exception as e:
+
+            print(
+                "Error al eliminar movimiento:",
+                e
+            )
+
+            messagebox.showerror(
+                "No se puede eliminar",
+                (
+                    "No fue posible eliminar el movimiento:\n\n"
+                    f"{e}"
+                ),
+                parent=self
+            )
+
+
+    # =====================================================
     # EXPORTAR A EXCEL
     # =====================================================
 
@@ -957,4 +1118,5 @@ class VentanaMovimientos(ctk.CTkToplevel):
                 self.focus_force()
 
             except Exception:
+
                 pass
